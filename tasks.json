@@ -1,0 +1,9 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "go test", "type": "shell", "command": "go test ./...", "group": "test" },
+    { "label": "go test -race", "type": "shell", "command": "go test -race ./...", "group": "test" },
+    { "label": "go bench", "type": "shell", "command": "go test -bench=. -benchmem ./internal/...", "group": "test" },
+    { "label": "run CLI", "type": "shell", "command": "go run ./cmd/schedsim-cli -algo all", "group": "build" }
+  ]
+}

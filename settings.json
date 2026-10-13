@@ -1,0 +1,1 @@
+{ "go.lintTool": "go vet", "editor.formatOnSave": true, "[go]": { "editor.defaultFormatter": "golang.go" } }

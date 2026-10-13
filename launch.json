@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "CLI: interactive (type input)", "type": "go", "request": "launch", "mode": "auto",
+      "program": "${workspaceFolder}/cmd/schedsim-cli", "args": ["-i"], "console": "integratedTerminal" },
+    { "name": "CLI: all algorithms (demo data)", "type": "go", "request": "launch", "mode": "auto",
+      "program": "${workspaceFolder}/cmd/schedsim-cli", "args": ["-algo", "all"] },
+    { "name": "CLI: RR from CSV + LSM store", "type": "go", "request": "launch", "mode": "auto",
+      "program": "${workspaceFolder}/cmd/schedsim-cli",
+      "args": ["-algo", "rr", "-quantum", "3", "-file", "${workspaceFolder}/workloads/sample.csv", "-store", "${workspaceFolder}/data"] },
+    { "name": "GUI server :8080 (open http://localhost:8080)", "type": "go", "request": "launch", "mode": "auto",
+      "program": "${workspaceFolder}/cmd/schedsim-server" }
+  ]
+}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SchedSim - CPU Scheduling Simulator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f4f6f9;color:#12263a}
+ header{background:#12263a;color:#fff;padding:14px 24px;font-size:20px;font-weight:600}
+ main{max-width:1100px;margin:16px auto;padding:0 16px}
+ fieldset{background:#fff;border:1px solid #d5dce4;border-radius:8px;margin:0 0 12px;padding:12px 14px}
+ legend{font-weight:600;padding:0 6px}
+ label{margin-right:6px;font-size:14px}
+ input,select{padding:5px 7px;margin-right:12px;border:1px solid #b9c4d0;border-radius:4px;font-size:14px}
+ input[type=number]{width:70px}
+ button{padding:7px 14px;border:0;border-radius:5px;background:#1fa38a;color:#fff;font-size:14px;cursor:pointer;margin-right:8px}
+ button.sec{background:#5b6b7b} button.adv{background:#e08a1e}
+ table{border-collapse:collapse;width:100%;background:#fff}
+ th,td{border:1px solid #d5dce4;padding:6px 10px;text-align:center;font-size:14px}
+ th{background:#e8edf3}
+ #stats{font-weight:700;margin:10px 0}
+ #advice{white-space:pre-line;background:#fff8e8;border:1px solid #f0d49a;border-radius:8px;padding:10px 14px;display:none;margin-bottom:12px}
+ canvas{background:#fff;border:1px solid #d5dce4;border-radius:8px;width:100%}
+ #err{color:#b3261e;margin:6px 0;min-height:18px}
+</style></head><body>
+<header>SchedSim - CPU Scheduling Simulator with Smart Algorithm Advisor</header>
+<main>
+<fieldset><legend>Add Process</legend>
+ <label>PID</label><input id="pid" type="number" min="0" value="1">
+ <label>Arrival</label><input id="at" type="number" min="0" value="0">
+ <label>Burst</label><input id="bt" type="number" min="1" value="5">
+ <label>Priority (lower = higher)</label><input id="pr" type="number" min="0" value="1">
+ <button onclick="addProc()">Add Process</button>
+ <button class="sec" onclick="loadDemo()">Load Demo</button>
+ <button class="sec" onclick="clearAll()">Clear All</button>
+</fieldset>
+<fieldset><legend>Simulation Controls</legend>
+ <label>Algorithm</label>
+ <select id="algo">
+  <option value="fcfs">FCFS</option>
+  <option value="sjf">SJF (Non-Preemptive)</option>
+  <option value="srtf">SRTF (Preemptive SJF)</option>
+  <option value="priority">Priority (Preemptive)</option>
+  <option value="rr">Round Robin</option>
+  <option value="mlfq">MLFQ</option>
+ </select>
+ <label>Time Quantum (RR / MLFQ)</label><input id="tq" type="number" min="1" value="2">
+ <button onclick="run()">Run Simulation</button>
+ <button class="adv" onclick="advise()">Smart Advisor Recommendation</button>
+</fieldset>
+<div id="err"></div>
+<div id="advice"></div>
+<table><thead><tr><th>PID</th><th>AT</th><th>BT</th><th>Priority</th><th>CT</th><th>TAT</th><th>WT</th><th>RT</th></tr></thead><tbody id="rows"></tbody></table>
+<div id="stats">Average WT: - | Average TAT: - | CPU: - | Context switches: -</div>
+<canvas id="gantt" width="1100" height="300"></canvas>
+</main>
+<script>
+let procs=[];
+const $=id=>document.getElementById(id);
+const NAMES={fcfs:"FCFS",sjf:"SJF",srtf:"SRTF",priority:"Priority",rr:"Round Robin",mlfq:"MLFQ"};
+function err(m){$("err").textContent=m||""}
+function renderInput(){
+  $("rows").innerHTML=procs.map(p=>`<tr><td>P${p.pid}</td><td>${p.arrival}</td><td>${p.burst}</td><td>${p.priority}</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`).join("");
+}
+function addProc(){
+  const pid=parseInt($("pid").value),arrival=parseInt($("at").value),burst=parseInt($("bt").value),priority=parseInt($("pr").value);
+  if([pid,arrival,burst,priority].some(Number.isNaN)||pid<0||arrival<0||burst<1||priority<0) return err("Enter valid whole numbers (burst >= 1).");
+  if(procs.some(p=>p.pid===pid)) return err("PID "+pid+" already exists.");
+  err(); procs.push({pid,arrival,burst,priority}); renderInput();
+  $("pid").value=Math.max(...procs.map(p=>p.pid))+1;
+}
+function loadDemo(){procs=[{pid:1,arrival:0,burst:5,priority:2},{pid:2,arrival:1,burst:3,priority:1},{pid:3,arrival:2,burst:8,priority:4},{pid:4,arrival:3,burst:6,priority:3}];$("pid").value=5;err();renderInput()}
+function clearAll(){procs=[];$("pid").value=1;renderInput();$("advice").style.display="none";$("stats").textContent="Average WT: - | Average TAT: - | CPU: - | Context switches: -";const c=$("gantt");c.getContext("2d").clearRect(0,0,c.width,c.height);err()}
+async function simulate(algo){
+  const quantum=parseInt($("tq").value);
+  if(!(quantum>=1)) throw new Error("Enter a valid time quantum (>= 1).");
+  const r=await fetch("/simulate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({algo,quantum,processes:procs})});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function run(){
+  if(!procs.length) return err("Add at least one process first.");
+  try{
+    err(); const d=await simulate($("algo").value), res=d.result, m=d.metrics;
+    $("rows").innerHTML=res.procs.map(p=>`<tr><td>P${p.pid}</td><td>${p.arrival}</td><td>${p.burst}</td><td>${p.priority}</td><td>${p.finish}</td><td>${p.finish-p.arrival}</td><td>${p.finish-p.arrival-p.burst}</td><td>${p.start-p.arrival}</td></tr>`).join("");
+    $("stats").textContent=`Average WT: ${m.avg_waiting.toFixed(2)} | Average TAT: ${m.avg_turnaround.toFixed(2)} | CPU: ${m.cpu_utilization_pct.toFixed(1)}% | Context switches: ${res.context_switches}`;
+    gantt(res);
+  }catch(e){err(e.message)}
+}
+async function advise(){
+  if(!procs.length) return err("Add processes first to receive a recommendation.");
+  try{
+    err(); let best=null,min=Infinity,txt="Algorithm comparison (average waiting time):\n";
+    for(const a of Object.keys(NAMES)){
+      const m=(await simulate(a)).metrics;
+      txt+=`- ${NAMES[a]}: ${m.avg_waiting.toFixed(2)}\n`;
+      if(m.avg_waiting<min){min=m.avg_waiting;best=a}
+    }
+    txt+=`\nRecommended: ${NAMES[best]}\nReason: lowest average waiting time (${min.toFixed(2)}).`;
+    const el=$("advice");el.textContent=txt;el.style.display="block";
+  }catch(e){err(e.message)}
+}
+function gantt(res){
+  const c=$("gantt"),g=c.getContext("2d");g.clearRect(0,0,c.width,c.height);
+  const pids=[...new Set(res.gantt.filter(s=>s.pid>=0).map(s=>s.pid))];
+  const L=60,T=10,rowH=Math.min(40,(c.height-50)/Math.max(pids.length,1)),W=c.width-L-20,sc=W/res.total_time;
+  g.font="13px Segoe UI, Arial";g.textBaseline="middle";
+  pids.forEach((pid,i)=>{g.fillStyle="#12263a";g.textAlign="right";g.fillText("P"+pid,L-8,T+i*rowH+rowH/2)});
+  res.gantt.forEach(s=>{
+    if(s.pid<0) return;
+    const i=pids.indexOf(s.pid),x=L+s.start*sc,w=(s.end-s.start)*sc;
+    g.fillStyle=`hsl(${(i*67)%360},65%,70%)`;g.fillRect(x,T+i*rowH+3,w,rowH-6);
+    g.strokeStyle="#000";g.strokeRect(x,T+i*rowH+3,w,rowH-6);
+    g.fillStyle="#000";g.textAlign="center";if(w>26)g.fillText("P"+s.pid,x+w/2,T+i*rowH+rowH/2);
+  });
+  const y=T+pids.length*rowH+14;g.textAlign="center";g.fillStyle="#12263a";
+  const step=Math.max(1,Math.ceil(res.total_time/25));
+  for(let t=0;t<=res.total_time;t+=step) g.fillText(t,L+t*sc,y);
+}
+renderInput();
+</script></body></html>
